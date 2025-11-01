@@ -1,0 +1,37 @@
+#include <iostream>
+
+// This program calculates the necessary "Samples Per Beat" 
+// based on user input for Sampling Rate and Tempo.
+// This value (SamplesPerBeat) is critical for Real-Time audio generation.
+int main()
+{
+	// Variables to hold user input
+	int sampling = 0;
+	int SamplesPerBeat = 0;
+	int tempo = 0;
+	
+	std::cout << "--- Metronome Core Logic Setup ---\n\n";
+
+	// 1. Get Sampling Rate (e.g., 44100 or 48000 Hz)
+	std::cout << "Please give the sampling (Hz): ";
+	// FIX: Changed std:cin to std::cin
+	std::cin >> sampling;
+	std::cout << "The sampling is: " << sampling;
+
+	// 2. Get Tempo (Beats Per Minute)
+	// FIX: Changed endl to std::endl
+	std::cout << std::endl << "Please give the tempo (BPM): ";	
+	std::cin >> tempo;
+	std::cout << "The tempo is: " << tempo;
+
+	// Core Calculation:
+	// SamplesPerBeat = (Samples / Second) * (60 Seconds / Minute) / (Beats / Minute)
+	SamplesPerBeat = (sampling * 60) / tempo;
+	
+	// Display the result
+	std::cout << std::endl << "----------------------------------";
+	std::cout << std::endl << "The calculated SamplesPerBeat are: " << SamplesPerBeat;
+	std::cout << std::endl << "----------------------------------\n";
+	
+	return 0;
+}
