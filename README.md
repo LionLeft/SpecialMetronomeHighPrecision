@@ -4,4 +4,4 @@ One day, while struggling with a guitar exercise, I decided to combine my passio
 
 I imagine an application similar to Guitar Pro, but enhanced with an AI-powered exercise assistant that analyzes your performance in real time.
 
-Since then, I’ve been learning everything necessary to make this idea a reality — combining my studies in computer science with my love for music."I documented the entire development process by creating small, focused proof-of-concept programs at each stage. This ensures every core function is validated and tested independently.
+Since then, I’ve been learning everything necessary to make this idea a reality — combining my studies in computer science with my love for music.I documented the entire development process by creating small, focused proof-of-concept programs at each stage. This ensures every core function is validated and tested independently.
