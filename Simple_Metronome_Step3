@@ -1,5 +1,67 @@
-This program is a simple metronome .This is my progress step number 3 .
-It asks the user for a BPM (beats per minute), calculates the time interval between beats, and prints “Tick” messages at that rate. 
-It runs in a loop, using precise time delays to control the rhythm. 
-A separate thread waits for the user to press ENTER, and when that happens, it safely stops the metronome.
-Finally, the program displays the total time it ran and exits cleanly
+#include <iostream>
+#include <thread> // Required for std::thread and std::this_thread::sleep_for
+#include <chrono> // Required for timing functions like steady_clock and duration
+#include <atomic> // Required for std::atomic<bool> to safely stop the thread
+#include <limits> // Required for std::numeric_limits<...> in cin.ignore()
+
+// Forward declaration of the input handling function
+void WaitForEnter();
+// Atomic flag to signal the metronome loop to stop safely across threads
+std::atomic<bool> stopFlag(false);
+
+int main() {  
+    // --- 1. User Input and Initialization ---
+    int bpm;
+    std::cout << "Please give the bpm: ";
+    // Basic input validation
+    if (!(std::cin >> bpm) || bpm <= 0)
+        return 1; // Exit if input is invalid or less than 1
+
+    // Calculate the time interval between ticks in seconds (e.g., 60 BPM = 1.0 sec)
+    double tickSec = 60.0 / bpm;
+    double totalTime = 0.0; // Tracks the elapsed time in seconds for printing
+
+    // Clear the input buffer from the previous newline character after 'bpm' input
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    
+    // Start a separate thread to handle the user pressing ENTER to stop the metronome
+    std::thread inputThread(WaitForEnter);
+    
+    // Record the start time (the reference point for all subsequent ticks)
+    auto start = std::chrono::steady_clock::now();
+
+    // --- 2. The Metronome Thread Loop ---
+    while (!stopFlag) {
+        // Pause the current thread for the calculated tick duration.
+        // NOTE: This uses the OS scheduler and is prone to Jitter (inaccurate timing).
+        std::this_thread::sleep_for(std::chrono::duration<double>(tickSec));
+        
+        totalTime += tickSec;
+        
+        // Print the tick time to the console
+        std::cout << "Tick: " << totalTime << " sec" << std::endl;
+    }
+
+    // --- 3. Finalization and Cleanup ---
+    // Record the end time
+    auto end = std::chrono::steady_clock::now();
+    
+    // Calculate the total time the metronome ran for
+    std::chrono::duration<double> timeElapsed = end - start;
+
+    // Print final metrics
+    std::cout << "Elapsed time: " << timeElapsed.count() << " sec" << std::endl;
+    std::cout << "Program Finished" << std::endl; // The Greek text "Τέλος προγράμματος" is translated here
+
+    // Wait for the input thread to finish gracefully before main exits (mandatory)
+    inputThread.join();
+    return 0;  
+}
+
+// --- Helper function running in a separate thread ---
+void WaitForEnter() {
+    // Blocks execution until the user presses the ENTER key
+    std::cin.get();
+    // Set the flag to true, which signals the main loop to exit
+    stopFlag = true;
+}
