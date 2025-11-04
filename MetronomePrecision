@@ -1,0 +1,103 @@
+#include <iostream>
+#include <thread>
+#include <chrono>
+#include <atomic>
+#include <limits>
+#include <iomanip>
+
+// Include the Windows API header only if compiling on Windows
+#ifdef _WIN32
+#include <windows.h> // Required for SetThreadPriority and GetCurrentThread
+#endif
+
+// --- Helper Function: Waits for Enter Key ---
+void WaitForEnter();
+std::atomic<bool> stopFlag(false); // Flag to safely stop the metronome thread
+
+int main() {
+    // --- 1. User Input and Calculations ---
+    int bpm;
+    std::cout << "Please give the bpm: ";
+    if (!(std::cin >> bpm) || bpm <= 0)
+        return 1; // Exit if input is invalid or less than 1
+
+    // The desired interval between beats (in seconds)
+    double tickSec = 60.0 / bpm;
+    
+    // Clear the input buffer and start the input thread
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    std::thread inputThread(WaitForEnter);
+    
+    // --- 2. Apply High Priority (Windows-specific) ---
+    #ifdef _WIN32
+        // We set the priority for the CURRENT thread, which is the thread running main()
+        // and the metronome loop. THREAD_PRIORITY_HIGHEST is the highest reliable level.
+        BOOL result = SetThreadPriority(
+            GetCurrentThread(), 
+            THREAD_PRIORITY_HIGHEST // This is the  highest priority than THREAD_PRIORITY_TIME_CRITICAL
+        );
+
+        if (result == 0) {
+            std::cerr << "Warning: Failed to set thread priority! Jitter may be high.\n";
+        }
+    #endif
+    // -----------------------------------------------------------------
+    
+    // --- 3. Jitter Variables ---
+    int beatCount = 0;
+    // Use 'start' as the clock reference
+    auto start = std::chrono::steady_clock::now();
+    
+    std::cout << "\nStarting Metronome at " << bpm << " BPM (Target Interval: " 
+              << std::fixed << std::setprecision(4) << tickSec * 1000 << " ms)\n";
+    std::cout << "--------------------------------------------------------\n";
+    
+    // --- 4. The Real-Time Loop with Error Correction ---
+    while (!stopFlag) {
+        beatCount++;
+        
+        // (A) Calculate the TARGET TIME (Expected Time)
+        // This is the ideal time the current beat should occur
+        auto expectedTime = start + std::chrono::duration<double>(beatCount * tickSec);
+        
+        // (B) Calculate the TIME TO WAIT
+        auto timeToWait = expectedTime - std::chrono::steady_clock::now();
+
+        // (C) Sleep: We sleep only if we are ahead of schedule.
+        if (timeToWait.count() > 0) {
+            // Using sleep_for here is acceptable, but for highest precision, 
+            // many choose std::this_thread::sleep_until(expectedTime);
+            std::this_thread::sleep_for(timeToWait);
+        }
+
+        // (D) JITTER MEASUREMENT
+        auto actualTime = std::chrono::steady_clock::now();
+        std::chrono::duration<double> actualElapsed = actualTime - start;
+        
+        // Jitter is the difference between the Actual Time and the Ideal Time
+        std::chrono::duration<double> jitter = actualTime - expectedTime; 
+        
+        // (E) Print the results
+        std::cout << "Tick: " << beatCount 
+                  << " | Actual Time: " << std::fixed << std::setprecision(3) << actualElapsed.count() << "s"
+                  << " | Jitter (Error): " << std::fixed << std::setprecision(4) << jitter.count() * 1000 << " ms"
+                  << std::endl;
+    }
+
+    // --- 5. Cleanup and Final Output ---
+    auto end = std::chrono::steady_clock::now();
+    std::chrono::duration<double> timeElapsed = end - start;
+
+    std::cout << "\n--------------------------------------------------------\n";
+    std::cout << "Elapsed time: " << timeElapsed.count() << " sec" << std::endl;
+    std::cout << "Program Finished" << std::endl; // The final Greek text is translated
+    
+    // Ensure the input thread finishes before exiting
+    inputThread.join();
+    return 0;
+}
+
+void WaitForEnter() {
+    std::cin.get();
+    stopFlag = true;
+}
