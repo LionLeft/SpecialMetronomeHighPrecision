@@ -1,3 +1,5 @@
+This C++ program calculates the number of samples per beat (SamplesPerBeat), an essential parameter in real-time audio and metronome applications. By taking user input for the sampling rate (in Hz) and tempo (in beats per minute), it determines how many audio samples correspond to one musical beat using the formula (SamplingRate × 60) / Tempo. This calculation allows precise synchronization between digital audio signals and musical tempo, forming a fundamental part of tempo-based sound generation systems.
+
 #include <iostream>
 
 // This program calculates the necessary "Samples Per Beat" 
