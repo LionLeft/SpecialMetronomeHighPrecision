@@ -30,11 +30,11 @@ int main() {
     
     // --- 2. Apply High Priority (Windows-specific) ---
     #ifdef _WIN32
-        // We set the priority for the CURRENT thread, which is the thread running main()
-        // and the metronome loop. THREAD_PRIORITY_HIGHEST is the highest reliable level.
+        // Set the priority for the CURRENT thread (the thread running the metronome loop).
+        // THREAD_PRIORITY_TIME_CRITICAL is the highest reliable level for audio/real-time tasks.
         BOOL result = SetThreadPriority(
             GetCurrentThread(), 
-            THREAD_PRIORITY_HIGHEST // This is the  highest priority than THREAD_PRIORITY_TIME_CRITICAL
+            THREAD_PRIORITY_TIME_CRITICAL 
         );
 
         if (result == 0) {
@@ -90,7 +90,7 @@ int main() {
 
     std::cout << "\n--------------------------------------------------------\n";
     std::cout << "Elapsed time: " << timeElapsed.count() << " sec" << std::endl;
-    std::cout << "Program Finished" << std::endl; // The final Greek text is translated
+    std::cout << "Program Finished" << std::endl; // The Greek text "Τέλος προγράμματος" is translated
     
     // Ensure the input thread finishes before exiting
     inputThread.join();
