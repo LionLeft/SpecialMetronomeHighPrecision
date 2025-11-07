@@ -1,11 +1,13 @@
-This C++ program simulates a precise real-time metronome that measures and displays the timing accuracy (jitter) of each beat. 
-The user sets a tempo in BPM, and the program schedules every tick using high-resolution system clocks. 
-It calculates the ideal versus actual time of each beat and prints the jitter value in milliseconds, showing how much each tick deviates from perfect timing. 
-On a typical system, jitter values remain within ±0.2–1.5 ms depending on CPU load and operating system scheduling. 
-The program also sets a high thread priority level (THREAD_PRIORITY_HIGHEST) on Windows, which in practice provides more stable timing performance than the Time-Critical level, as the latter may cause system imbalance or excessive CPU locking. 
-This approach demonstrates an understanding of real-time optimization while maintaining overall system stability. 
-The implementation uses std::chrono::steady_clock for accurate timing, multithreading for asynchronous control, and atomic flags for safe thread communication. 
-Overall, this project highlights key concepts of real-time scheduling, latency control, and synchronization, essential in audio and timing-critical software development.#include <iostream>
+/*
+This C++ program simulates a precise real-time metronome that measures and displays the timing accuracy (jitter) of each beat.
+The user sets a tempo in BPM, and the program schedules every tick using high-resolution system clocks.
+It calculates the ideal versus actual time of each beat and prints the jitter value in milliseconds, showing how much each tick deviates from perfect timing.
+On a typical system, jitter values remain within ±0.2–1.5 ms depending on CPU load and operating system scheduling.
+The program also sets a high thread priority level (THREAD_PRIORITY_HIGHEST) on Windows, which in practice provides more stable timing performance than the Time-Critical level, as the latter may cause system imbalance or excessive CPU locking.
+This approach demonstrates an understanding of real-time optimization while maintaining overall system stability.
+The implementation uses std::chrono::steady_clock for accurate timing, multithreading for asynchronous control, and atomic flags for safe thread communication.
+Overall, this project highlights key concepts of real-time scheduling, latency control, and synchronization, essential in audio and timing-critical software development.
+*/
 #include <thread>
 #include <chrono>
 #include <atomic>
