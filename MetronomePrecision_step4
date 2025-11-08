@@ -1,3 +1,17 @@
+/*
+This C++ program implements a real-time metronome that uses the highest Windows thread priority level,
+THREAD_PRIORITY_TIME_CRITICAL, to achieve extremely accurate beat timing. The program measures and prints
+the jitter of each beat in milliseconds, showing how much the actual trigger time deviates from the ideal one.
+
+While this priority level provides the lowest jitter (often around ±0.1–0.5 ms), it can negatively affect
+overall system stability by blocking essential background tasks. In comparison, the THREAD_PRIORITY_HIGHEST
+setting achieves nearly identical precision while maintaining smoother system performance.
+
+Therefore, although the Time-Critical priority demonstrates the maximum achievable timing accuracy,
+the High Priority configuration is generally the better and more balanced choice for real-time applications.
+This experiment highlights the trade-off between absolute precision and practical stability in timing-critical
+software such as metronomes and audio processing tools.
+*/
 #include <iostream>
 #include <thread>
 #include <chrono>
