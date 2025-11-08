@@ -1,17 +1,31 @@
+/* 
+This program acts as a simple timer that measures how long it takes for the user to press the Enter key. 
+It starts timing when the prompt appears and waits for input. 
+If the user presses Enter, the timer stops and the elapsed time is calculated and displayed. 
+If the user types “q” or “Q”, the program ends and displays a completion message. 
+The program uses the C++ <chrono> library for precise time measurement and std::getline for input handling, 
+allowing it to detect an empty Enter press correctly.This work represents the second step in my progressive learning process, where each program
+builds upon the previous one to improve accuracy, performance, and understanding of real-time
+systems in C++.
+*/
+
 #include <iostream>
 #include <chrono>
 #include <string>
 
-// Importing specific components (best practice)
+// Importing specific components for cleaner syntax (personal preference).
+// In future projects, I may prefer to use the full std:: prefix for clarity.
 using std::cout;
 using std::cin;
 using std::endl;
 using std::string;
 
-// Importing specific tools from the <chrono> library
+// Importing selected tools from <chrono> for timing operations.
+// In later programs, I plan to use explicit std::chrono:: references instead.
 using std::chrono::steady_clock;
 using std::chrono::seconds;
 using std::chrono::duration_cast;
+
 
 int main() {
     string input;
