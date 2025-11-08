@@ -10,7 +10,9 @@ setting achieves nearly identical precision while maintaining smoother system pe
 Therefore, although the Time-Critical priority demonstrates the maximum achievable timing accuracy,
 the High Priority configuration is generally the better and more balanced choice for real-time applications.
 This experiment highlights the trade-off between absolute precision and practical stability in timing-critical
-software such as metronomes and audio processing tools.
+software such as metronomes and audio processing tools.This work represents the fourth step in my progressive learning process, where each program
+builds upon the previous one to improve accuracy, performance, and understanding of real-time
+systems in C++.
 */
 #include <iostream>
 #include <thread>
