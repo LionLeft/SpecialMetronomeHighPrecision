@@ -3,7 +3,7 @@ It asks the user for a BPM (beats per minute), calculates the time interval betw
 It runs in a loop, using precise time delays to control the rhythm. 
 A separate thread waits for the user to press ENTER, and when that happens, it safely stops the metronome.
 Finally, the program displays the total time it ran and exits cleanly .This work represents the third step in my progressive learning process, 
-here each programbuilds upon the previous one to improve accuracy,performance, and understanding of real-timesystems in C++.*/
+here each program builds upon the previous one to improve accuracy,performance, and understanding of real-timesystems in C++.*/
 #include <iostream>
 #include <thread> // Required for std::thread and std::this_thread::sleep_for
 #include <chrono> // Required for timing functions like steady_clock and duration
