@@ -20,12 +20,10 @@ int main()
 
 	// 1. Get Sampling Rate (e.g., 44100 or 48000 Hz)
 	std::cout << "Please give the sampling (Hz): ";
-	// FIX: Changed std:cin to std::cin
 	std::cin >> sampling;
 	std::cout << "The sampling is: " << sampling;
 
 	// 2. Get Tempo (Beats Per Minute)
-	// FIX: Changed endl to std::endl
 	std::cout << std::endl << "Please give the tempo (BPM): ";	
 	std::cin >> tempo;
 	std::cout << "The tempo is: " << tempo;
