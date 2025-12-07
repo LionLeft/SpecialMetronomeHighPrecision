@@ -1,0 +1,590 @@
+/*
+This is my sixth major progress update on this metronome and guitar-training system.
+In this version, I added time-signature support and RtAudio integration.
+
+The program can now:
+
+Detect the notes played on my electric guitar in real time
+
+Analyze the timing of each note
+
+Provide feedback such as “Slow”, “Perfect”, or “Late”
+
+I designed this tool to help beginner musicians improve their timing accuracy.
+It represents the combination of my two biggest passions:
+
+computer science and music.
+*/
+/*
+ * ============================================================================
+ * ADVANCED GUITAR PRACTICE METRONOME WITH REAL-TIME TIMING ANALYSIS
+ * ============================================================================
+ *
+ * DESCRIPTION:
+ * An interactive metronome application designed for musicians (especially
+ * guitarists) to practice with real-time feedback on timing accuracy.
+ *
+ * KEY FEATURES:
+ * - Audible metronome clicks with accent on downbeats
+ * - Real-time audio input monitoring to detect instrument notes
+ * - Precise timing analysis (detects early/late playing within milliseconds)
+ * - Support for multiple subdivisions: quarter notes, half notes, triplets, eighth notes
+ * - Multi-threaded architecture for accurate timing
+ * - Cross-platform audio I/O using RtAudio library
+ *
+ * TECHNICAL HIGHLIGHTS:
+ * - Uses atomic variables for thread-safe communication
+ * - High-precision timing with std::chrono
+ * - Real-time audio processing with callback functions
+ * - Digital signal processing for click sound generation
+ * - Audio threshold detection for instrument input
+ *
+ * AUTHOR: [Your Name]
+ * DATE: November 2025
+ * TECHNOLOGIES: C++17, RtAudio, Multi-threading, DSP
+ * ============================================================================
+ */
+
+#include <iostream>
+#include <thread>
+#include <chrono>
+#include <atomic>
+#include <limits>
+#include <iomanip>
+#include <cmath>
+#include <exception>
+
+#define _USE_MATH_DEFINES
+#include <math.h>
+
+#include "RtAudio.h"
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
+// ============================================================================
+// GLOBAL VARIABLES
+// ============================================================================
+// Thread-safe atomic variables for inter-thread communication
+std::atomic<bool> stopFlag(false);           // Signal to stop all threads
+std::atomic<double> lastPluckTime(-1.0);     // Timestamp of last detected note
+std::atomic<bool> shouldPlayClick(false);    // Flag to trigger click sound
+std::atomic<bool> accentClick(false);        // Flag for accented vs regular click
+
+// ============================================================================
+// AUDIO OUTPUT CALLBACK FUNCTION
+// ============================================================================
+/*
+ * This callback is called by RtAudio whenever the audio buffer needs data.
+ * It generates metronome click sounds in real-time using digital synthesis.
+ *
+ * PARAMETERS:
+ * - outputBuffer: Buffer to fill with audio samples
+ * - nBufferFrames: Number of sample frames to generate
+ * - shouldPlayClick: Atomic flag indicating whether to play a click
+ * - accentClick: Atomic flag for accent (higher pitch) or regular click
+ *
+ * AUDIO SYNTHESIS:
+ * - Generates sine wave at 1200 Hz (accent) or 800 Hz (regular)
+ * - Applies exponential decay envelope for percussive "click" sound
+ * - 30ms duration with fast attack and decay
+ */
+int outputCallback(
+    void* outputBuffer,
+    void* inputBuffer,
+    unsigned int nBufferFrames,
+    double streamTime,
+    RtAudioStreamStatus status,
+    void* userData
+) {
+    float* out = static_cast<float*>(outputBuffer);
+
+    if (shouldPlayClick.load()) {
+        bool accent = accentClick.load();
+        float frequency;
+	if (accent) {
+		frequency = 1200.0f;
+		} else {
+		frequency = 800.0f;
+	}
+
+        const float sampleRate = 44100.0f;
+        const float duration = 0.03f;  // 30ms click duration
+
+        // Generate click sound using DSP
+        for (unsigned int i = 0; i < nBufferFrames; i++) {
+            float t = i / sampleRate;
+            if (t < duration) {
+                // Exponential decay envelope for percussive sound
+                float envelope = std::exp(-t * 30.0f);
+                // Sine wave oscillator with envelope
+                out[i] = std::sin(2.0f * M_PI * frequency * t) * envelope * 0.5f;
+            } else {
+                out[i] = 0.0f;  // Silence after click
+            }
+        }
+        shouldPlayClick = false;  // Reset flag
+    } else {
+        // Output silence when no click is needed
+        for (unsigned int i = 0; i < nBufferFrames; i++) {
+            out[i] = 0.0f;
+        }
+    }
+
+    return 0;
+}
+
+// ============================================================================
+// AUDIO INPUT CALLBACK FUNCTION
+// ============================================================================
+/*
+ * This callback processes incoming audio from the microphone/instrument.
+ * It detects note attacks using amplitude threshold detection.
+ *
+ * SIGNAL PROCESSING:
+ * - Monitors audio amplitude sample-by-sample
+ * - Detects rising edge when signal crosses threshold (0.25)
+ * - Records precise timestamp of note attack
+ * - Uses static variable to track previous sample for edge detection
+ *
+ * PARAMETERS:
+ * - inputBuffer: Audio samples from microphone
+ * - nBufferFrames: Number of samples in buffer
+ * - userData: Pointer to start time for timestamp calculation
+ */
+int audioCallback(
+    void* outputBuffer,
+    void* inputBuffer,
+    unsigned int nBufferFrames,
+    double streamTime,
+    RtAudioStreamStatus status,
+    void* userData
+) {
+    if (!inputBuffer) return 0;
+
+    auto* startTimePtr = static_cast<double*>(userData);
+    float* in = static_cast<float*>(inputBuffer);
+    static float prev = 0.0f;  // Previous sample for edge detection
+    float threshold = 0.25f;   // Amplitude threshold for note detection
+
+    // Process each audio sample
+    for (unsigned int i = 0; i < nBufferFrames; i++) {
+        float sample = in[i];
+
+        // Detect rising edge (note attack)
+        if (std::fabs(sample) > threshold && std::fabs(prev) <= threshold) {
+            // Record precise timestamp of note attack
+            double now = std::chrono::duration<double>(
+                std::chrono::steady_clock::now().time_since_epoch()
+            ).count();
+            lastPluckTime = now - *startTimePtr;  // Relative to program start
+        }
+        prev = sample;
+    }
+
+    return 0;
+}
+
+// ============================================================================
+// FUNCTION DECLARATIONS
+// ============================================================================
+void WaitForEnter();                          // Monitors keyboard for stop signal
+void AudioListener(double startTime);         // Handles audio input stream
+void AudioOutput();                           // Handles audio output stream
+void playClickSound(bool accent = false);     // Triggers metronome click
+
+// ============================================================================
+// MAIN PROGRAM
+// ============================================================================
+int main() {
+    // ========================================================================
+    // AUDIO SYSTEM DIAGNOSTIC
+    // ========================================================================
+    // Display available audio APIs for debugging/verification
+    std::vector<RtAudio::Api> apis;
+    RtAudio::getCompiledApi(apis);
+
+    std::cout << "=== RtAudio Diagnostic ===\n";
+    std::cout << "Compiled APIs (" << apis.size() << "):\n";
+    for (auto api : apis) {
+        std::cout << "  - " << RtAudio::getApiName(api) << std::endl;
+    }
+    std::cout << "========================\n\n";
+
+    // ========================================================================
+    // USER INPUT: BPM AND SUBDIVISION SELECTION
+    // ========================================================================
+    int bpm;
+    std::cout << "Please enter the BPM: ";
+    if (!(std::cin >> bpm) || bpm <= 0) return 1;
+
+    int subdivisionChoice;
+    std::cout << "Choose subdivision:\n";
+    std::cout << "1 = Quarter notes (default)\n";
+    std::cout << "2 = Half notes\n";
+    std::cout << "3 = Triplets\n";
+    std::cout << "4 = Eighth notes\n";
+    std::cin >> subdivisionChoice;
+
+    // ========================================================================
+    // TIMING CALCULATIONS
+    // ========================================================================
+    // Calculate beat duration and subdivision intervals
+    double beatSec = 60.0 / bpm;  // Duration of one quarter note beat
+    int notesPerBeat = 1;         // Number of subdivisions per beat
+    std::string subdivisionName = "Quarter notes";
+
+    // Configure subdivision settings
+    if (subdivisionChoice == 2) {
+        notesPerBeat = 1;
+        subdivisionName = "Half notes";
+        beatSec = beatSec * 2;  // Half notes are twice as slow
+    }
+    else if (subdivisionChoice == 3) {
+        notesPerBeat = 3;       // Three notes per beat
+        subdivisionName = "Triplets";
+    }
+    else if (subdivisionChoice == 4) {
+        notesPerBeat = 2;       // Two notes per beat
+        subdivisionName = "Eighth notes";
+    }
+
+    double subTickSec = beatSec / notesPerBeat;  // Time between each subdivision
+
+    // ========================================================================
+    // THREAD INITIALIZATION
+    // ========================================================================
+    // Clear input buffer
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
+    // Start keyboard monitoring thread
+    std::thread inputThread(WaitForEnter);
+
+    // Set high priority for timing accuracy on Windows
+#ifdef _WIN32
+    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
+#endif
+
+    // Record start time for timestamp calculations
+    auto start = std::chrono::steady_clock::now();
+
+    // Start audio input thread (listens to instrument)
+    std::thread audioThread(AudioListener,
+        std::chrono::duration<double>(start.time_since_epoch()).count()
+    );
+
+    // Start audio output thread (plays metronome clicks)
+    std::thread outputThread(AudioOutput);
+
+    // ========================================================================
+    // METRONOME MAIN LOOP
+    // ========================================================================
+    /*
+     * This loop runs at the subdivision rate (not just beat rate).
+     * For triplets at 60 BPM: 3 ticks per second (333ms intervals)
+     *
+     * TIMING STRATEGY:
+     * - Calculates expected time for each tick
+     * - Sleeps until expected time
+     * - Measures actual time and jitter
+     * - Analyzes any detected notes for timing accuracy
+     */
+
+    int tickCount = 0;
+    std::cout << "\nStarting Metronome at " << bpm << " BPM (" << subdivisionName << ")\n";
+    std::cout << "Subdivision interval: " << std::fixed << std::setprecision(2)
+              << subTickSec * 1000 << " ms\n";
+    std::cout << "Press ENTER to stop\n";
+    std::cout << "--------------------------------------------------------\n";
+
+    while (!stopFlag) {
+        tickCount++;
+
+        // Calculate position in musical time
+        int mainBeat = (tickCount - 1) / notesPerBeat + 1;  // Which beat (1, 2, 3...)
+        int subDiv = (tickCount - 1) % notesPerBeat + 1;    // Which subdivision (1, 2, 3)
+
+        // ====================================================================
+        // PRECISION TIMING
+        // ====================================================================
+        // Calculate expected time and sleep until then
+        auto expectedTime = start + std::chrono::duration<double>(tickCount * subTickSec);
+        auto timeToWait = expectedTime - std::chrono::steady_clock::now();
+        if (timeToWait.count() > 0) {
+            std::this_thread::sleep_for(timeToWait);
+        }
+
+        // Measure actual timing for accuracy monitoring
+        auto actualTime = std::chrono::steady_clock::now();
+        std::chrono::duration<double> actualElapsed = actualTime - start;
+        std::chrono::duration<double> jitter = actualTime - expectedTime;
+
+        // ====================================================================
+        // VISUAL FEEDBACK
+        // ====================================================================
+        // Display tick with emphasis on downbeats
+        if (subDiv == 1) {
+            std::cout << "\n=== BEAT " << mainBeat << " ===";
+            playClickSound(true);  // Accent (high pitch) on downbeat
+        } else {
+            std::cout << "  Sub " << subDiv << " (Beat " << mainBeat << ")";
+            playClickSound(false);  // Regular (low pitch) on subdivision
+        }
+
+        // Display timing information
+        std::cout << " | Time: " << std::fixed << std::setprecision(3)
+                  << actualElapsed.count() << "s"
+                  << " | Jitter: " << std::fixed << std::setprecision(2)
+                  << jitter.count() * 1000 << " ms";
+
+        // ====================================================================
+        // TIMING ANALYSIS OF DETECTED NOTES
+        // ====================================================================
+        /*
+         * When a note is detected, we need to determine which subdivision
+         * it was intended for and calculate the timing error.
+         *
+         * ALGORITHM:
+         * 1. Retrieve the detected note timestamp
+         * 2. Calculate error relative to current, previous, and next subdivisions
+         * 3. Match to the closest subdivision
+         * 4. Display timing feedback based on error magnitude
+         */
+        double pluck = lastPluckTime.exchange(-1.0);
+        if (pluck > 0.0) {
+            // Calculate timing error relative to THIS subdivision
+            double expectedSubTime = (tickCount - 1) * subTickSec;
+            double errorMs = (pluck - expectedSubTime) * 1000.0;
+
+            // Check if note belongs to previous or next subdivision
+            double prevError = (pluck - (tickCount - 2) * subTickSec) * 1000.0;
+            double nextError = (pluck - tickCount * subTickSec) * 1000.0;
+
+            // Find closest subdivision match
+            double closestError = errorMs;
+            if (tickCount > 1 && std::fabs(prevError) < std::fabs(closestError)) {
+                closestError = prevError;
+                std::cout << " [matched to previous]";
+            }
+            if (std::fabs(nextError) < std::fabs(closestError)) {
+                closestError = nextError;
+                std::cout << " [matched to next]";
+            }
+
+            // ================================================================
+            // FEEDBACK BASED ON TIMING ACCURACY
+            // ================================================================
+            // Display timing feedback with graduated severity
+            if (std::fabs(closestError) < 30) {
+                // Within 30ms - Excellent timing
+                std::cout << " | *** PERFECT! ***";
+            }
+            else if (std::fabs(closestError) < 50) {
+                // 30-50ms - Good but noticeable
+                if (closestError > 0)
+                    std::cout << " | LATE by " << std::fixed << std::setprecision(1)
+                              << closestError << " ms";
+                else
+                    std::cout << " | EARLY by " << std::fixed << std::setprecision(1)
+                              << -closestError << " ms";
+            }
+            else {
+                // Over 50ms - Significant timing issue
+                if (closestError > 0)
+                    std::cout << " | >> TOO LATE (" << std::fixed << std::setprecision(1)
+                              << closestError << " ms)";
+                else
+                    std::cout << " | << TOO EARLY (" << std::fixed << std::setprecision(1)
+                              << -closestError << " ms)";
+            }
+        }
+
+        std::cout << std::endl;
+    }
+
+    // ========================================================================
+    // CLEANUP AND STATISTICS
+    // ========================================================================
+    auto end = std::chrono::steady_clock::now();
+    std::chrono::duration<double> timeElapsed = end - start;
+
+    std::cout << "\n--------------------------------------------------------\n";
+    std::cout << "Elapsed time: " << std::fixed << std::setprecision(2)
+              << timeElapsed.count() << " sec\n";
+    std::cout << "Total ticks: " << tickCount << "\n";
+    std::cout << "Program Finished\n";
+
+    // Wait for all threads to complete
+    inputThread.join();
+    stopFlag = true;
+    audioThread.join();
+    outputThread.join();
+
+    return 0;
+}
+
+// ============================================================================
+// KEYBOARD INPUT THREAD
+// ============================================================================
+/*
+ * Monitors keyboard input in a separate thread.
+ * Waits for Enter key press to signal program termination.
+ * Uses blocking I/O which is acceptable in a dedicated thread.
+ */
+void WaitForEnter() {
+    std::cin.get();
+    stopFlag = true;
+}
+
+// ============================================================================
+// AUDIO INPUT LISTENER THREAD
+// ============================================================================
+/*
+ * Manages the audio input stream for instrument monitoring.
+ *
+ * SETUP:
+ * - Initializes RtAudio for input capture
+ * - Configures for mono (1 channel) input
+ * - Uses default input device (microphone/line-in)
+ * - 44.1 kHz sample rate, 256 sample buffer
+ *
+ * LIFECYCLE:
+ * - Opens and starts audio stream
+ * - Runs continuously until stopFlag is set
+ * - Properly closes stream on exit
+ */
+void AudioListener(double startTime) {
+    RtAudio adc;
+
+    // Check for available audio input devices
+    if (adc.getDeviceCount() < 1) {
+        std::cerr << "No audio devices found!\n";
+        stopFlag = true;
+        return;
+    }
+
+    // Configure input stream parameters
+    RtAudio::StreamParameters params;
+    params.deviceId = adc.getDefaultInputDevice();
+    params.nChannels = 1;          // Mono input
+    params.firstChannel = 0;
+
+    unsigned int sampleRate = 44100;   // CD quality sample rate
+    unsigned int bufferFrames = 256;   // Small buffer for low latency
+
+    try {
+        // Open audio input stream
+        adc.openStream(
+            nullptr,            // No output
+            &params,            // Input parameters
+            RTAUDIO_FLOAT32,    // 32-bit float samples
+            sampleRate,
+            &bufferFrames,
+            &audioCallback,     // Callback function
+            &startTime          // User data (start time)
+        );
+        adc.startStream();
+    }
+    catch (const std::exception &e) {
+        std::cerr << "RtAudio exception: " << e.what() << "\n";
+        stopFlag = true;
+        return;
+    }
+    catch (...) {
+        std::cerr << "Unknown RtAudio error!\n";
+        stopFlag = true;
+        return;
+    }
+
+    // Keep stream running until program stops
+    while (!stopFlag) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
+    // Cleanup
+    adc.stopStream();
+    adc.closeStream();
+}
+
+// ============================================================================
+// CLICK SOUND TRIGGER
+// ============================================================================
+/*
+ * Triggers a metronome click sound by setting atomic flags.
+ * The actual sound generation happens in the audio callback.
+ *
+ * PARAMETERS:
+ * - accent: true for downbeat (high pitch), false for subdivision (low pitch)
+ */
+void playClickSound(bool accent) {
+    accentClick = accent;
+    shouldPlayClick = true;
+}
+
+// ============================================================================
+// AUDIO OUTPUT THREAD
+// ============================================================================
+/*
+ * Manages the audio output stream for metronome clicks.
+ *
+ * ARCHITECTURE:
+ * - Opens a persistent audio output stream
+ * - Stream stays open throughout program execution
+ * - Callback generates clicks on-demand based on atomic flags
+ * - Much more efficient than opening/closing stream per click
+ *
+ * AUDIO CONFIGURATION:
+ * - 44.1 kHz sample rate
+ * - 512 sample buffer for smooth playback
+ * - Mono output (1 channel)
+ */
+void AudioOutput() {
+    RtAudio dac;
+
+    // Check for available audio output devices
+    if (dac.getDeviceCount() < 1) {
+        std::cerr << "No audio output devices found!\n";
+        return;
+    }
+
+    // Configure output stream parameters
+    RtAudio::StreamParameters params;
+    params.deviceId = dac.getDefaultOutputDevice();
+    params.nChannels = 1;          // Mono output
+    params.firstChannel = 0;
+
+    unsigned int sampleRate = 44100;
+    unsigned int bufferFrames = 512;
+
+    try {
+        // Open audio output stream
+        dac.openStream(
+            &params,            // Output parameters
+            nullptr,            // No input
+            RTAUDIO_FLOAT32,    // 32-bit float samples
+            sampleRate,
+            &bufferFrames,
+            &outputCallback,    // Callback function
+            nullptr             // No user data needed
+        );
+        dac.startStream();
+    }
+    catch (const std::exception &e) {
+        std::cerr << "RtAudio output exception: " << e.what() << "\n";
+        return;
+    }
+    catch (...) {
+        std::cerr << "Unknown RtAudio output error!\n";
+        return;
+    }
+
+    // Keep stream running until program stops
+    while (!stopFlag) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
+    // Cleanup
+    dac.stopStream();
+    dac.closeStream();
+}
