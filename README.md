@@ -3,7 +3,7 @@
 
 ▶ **Demo Video:** [YouTube](https://www.youtube.com/watch?v=KWwBHGTHi14)  
 
-🔗 **LinkedIn:** [lionakis-lefteris](lionakis-lefteris-698453346)
+🔗 **LinkedIn:** [lionakis-lefteris](https://www.linkedin.com/in/lionakis-lefteris-698453346/))
 
 💻 **GitHub:** [LionLeft](https://github.com/LionLeft)
 
