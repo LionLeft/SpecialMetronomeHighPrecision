@@ -2,7 +2,9 @@
 
 
 ▶ **Demo Video:** [YouTube](https://www.youtube.com/watch?v=KWwBHGTHi14)  
-🔗 **LinkedIn:** [lionakis-lefteris](https://www.linkedin.com/in/lionakis-lefteris/)
+
+🔗 **LinkedIn:** [lionakis-lefteris](www.linkedin.com/in/lionakis-lefteris-698453346)
+
 💻 **GitHub:** [LionLeft](https://github.com/LionLeft)
 
 I’m a 43-year-old Computer Science student at the Hellenic Open University and also a guitar student — I’ve been taking guitar lessons for seven years and continue to do so.
