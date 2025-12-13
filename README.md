@@ -6,13 +6,6 @@
 
 
 
-💻 **GitHub:** https://github.com/LionLeft
-
-▶ Demo Video: YouTube
-
-🔗 LinkedIn: lionakis-lefteris
-
-💻 GitHub: LionLeft
 
 
 I’m a 43-year-old Computer Science student at the Hellenic Open University and also a guitar student — I’ve been taking guitar lessons for seven years and continue to do so.
