@@ -1,4 +1,12 @@
-My video:[https://studio.youtube.com/video/KWwBHGTHi14/edit](https://youtu.be/KWwBHGTHi14)
+# 🎸 Special Metronome – High Precision
+
+▶ **Demo Video:** [https://studio.youtube.com/video/KWwBHGTHi14/edit](https://youtu.be/KWwBHGTHi14)
+
+🔗 **LinkedIn:**:https://www.linkedin.com/in/lionakis-lefteris-698453346?lipi=urn%3Ali%3Apage%3Ad_flagship3_profile_view_base_contact_details%3B4EFRAc6IQgilmAUhTWulUw%3D%3D
+💻 **GitHub:** https://github.com/LionLeft
+
+
+
 
 My Linkedln:https://www.linkedin.com/in/lionakis-lefteris-698453346?lipi=urn%3Ali%3Apage%3Ad_flagship3_profile_view_base_contact_details%3B4EFRAc6IQgilmAUhTWulUw%3D%3D
 
