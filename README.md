@@ -1,3 +1,5 @@
+https://studio.youtube.com/video/KWwBHGTHi14/edit
+
 I’m a 43-year-old Computer Science student at the Hellenic Open University and also a guitar student — I’ve been taking guitar lessons for seven years and continue to do so.
 
 One day, while struggling with a guitar exercise, I decided to combine my passion for music and programming to solve the problem. That’s when I came up with the idea of creating a metronome that can “hear” the notes you play and give feedback when you make mistakes.
