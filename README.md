@@ -1,4 +1,5 @@
 [https://studio.youtube.com/video/KWwBHGTHi14/edit](https://youtu.be/KWwBHGTHi14)
+https://www.linkedin.com/in/lionakis-lefteris-698453346?lipi=urn%3Ali%3Apage%3Ad_flagship3_profile_view_base_contact_details%3B4EFRAc6IQgilmAUhTWulUw%3D%3D
 
 I’m a 43-year-old Computer Science student at the Hellenic Open University and also a guitar student — I’ve been taking guitar lessons for seven years and continue to do so.
 
