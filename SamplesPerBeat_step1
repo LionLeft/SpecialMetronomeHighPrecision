@@ -13,7 +13,7 @@ int main()
 {
 	// Variables to hold user input
 	int sampling = 0;
-	int SamplesPerBeat = 0;
+	float SamplesPerBeat = 0;
 	int tempo = 0;
 	
 	std::cout << "--- Metronome Core Logic Setup ---\n\n";
@@ -30,7 +30,9 @@ int main()
 
 	// Core Calculation:
 	// SamplesPerBeat = (Samples / Second) * (60 Seconds / Minute) / (Beats / Minute)
-	SamplesPerBeat = (sampling * 60) / tempo;
+	// Use floating-point for audio timing precision
+	// Integer division would cause timing drift
+	SamplesPerBeat = (sampling * 60.0f) / tempo;
 	
 	// Display the result
 	std::cout << std::endl << "----------------------------------";
