@@ -106,7 +106,7 @@ int main() {
 
     std::cout << "\n--------------------------------------------------------\n";
     std::cout << "Elapsed time: " << timeElapsed.count() << " sec" << std::endl;
-    std::cout << "Program Finished" << std::endl; // The Greek text "Τέλος προγράμματος" is translated
+    std::cout << "Program Finished" << std::endl; // end of the program
     
     // Ensure the input thread finishes before exiting
     inputThread.join();
