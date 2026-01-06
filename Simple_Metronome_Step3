@@ -57,7 +57,7 @@ int main() {
 
     // Print final metrics
     std::cout << "Elapsed time: " << timeElapsed.count() << " sec" << std::endl;
-    std::cout << "Program Finished" << std::endl; // The Greek text "Τέλος προγράμματος" is translated here
+    std::cout << "Program Finished" << std::endl; // end of the program
 
     // Wait for the input thread to finish gracefully before main exits (mandatory)
     inputThread.join();
