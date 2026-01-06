@@ -13,19 +13,12 @@ systems in C++.
 #include <chrono>
 #include <string>
 
-// Importing specific components for cleaner syntax (personal preference).
-// In future projects, I may prefer to use the full std:: prefix for clarity.
 using std::cout;
 using std::cin;
 using std::endl;
 using std::string;
-
-// Importing selected tools from <chrono> for timing operations.
-// In later programs, I plan to use explicit std::chrono:: references instead.
 using std::chrono::steady_clock;
-using std::chrono::seconds;
-using std::chrono::duration_cast;
-
+using std::chrono::duration;
 
 int main() {
     string input;
@@ -34,20 +27,27 @@ int main() {
         // Start the timer
         auto start = steady_clock::now();
 
-        // Prompt the user to press enter 
-        cout << "Press ENTER to stop the timer, or type 'q' to quit: ";
+        // Prompt the user
+        cout << "Timer started! Press ENTER to stop, or type 'q' to quit: ";
         
-        // Use std::getline to read the entire line of input
-        // This is better for checking empty input (just Enter)
+        // Read input
         std::getline(cin, input); 
 
         // Check for quit command
-        if (input == "q" || input == "Q") 
-        {
-            cout << "Program finished.\n";
-            break;
-        }while (true);
-         return 0;
-        } 
-
+        if (input == "q" || input == "Q") {
+            cout << "Program finished." << endl;
+            break; 
         }
+
+        // Record the end time
+        auto end = steady_clock::now();
+
+        // Calculate duration in seconds (using double for decimals)
+        duration<double> elapsed = end - start;
+
+        cout << "Elapsed time: " << elapsed.count() << " seconds\n" << endl;
+
+    } while (true); 
+
+    return 0;
+} 
