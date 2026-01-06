@@ -46,4 +46,8 @@ int main() {
         {
             cout << "Program finished.\n";
             break;
+        }while (true);
+         return 0;
+        } 
+
         }
