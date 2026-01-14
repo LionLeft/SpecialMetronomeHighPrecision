@@ -1,6 +1,6 @@
 In my link video is a early working version. The core real-time audio engine and note detection were already functional. Since recording i notice
-that i have a problem with time signature i pluck my guitar in the correct time signature of metronome but the feedback was too early or too late and sometimes perfect .
+that i had a problem with time signature.When i pluck my guitar in the correct time signature of metronome but the feedback was too early or too late and sometimes perfect .
 I've made significant debugging progress:
 1)Refactored from dual callbacks to a single duplex callback to eliminate threading issues ,but i notice the problem was still there.
 2) Maybe the problem is the connected cable with my amplifier.
-I will keep test the code with my guitar until a new update.
+I will keep testing the code with my guitar until a new update of metronome.
