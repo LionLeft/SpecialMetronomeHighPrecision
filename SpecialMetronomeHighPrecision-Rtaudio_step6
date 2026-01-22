@@ -18,42 +18,42 @@ computer science and music.
  * ============================================================================
  * DEBUGGING PROCESS - HOW THE BUGS WERE FOUND:
  * ============================================================================
- * 
- * SYMPTOM: "When playing guitar fast, it shows PERFECT every time and 
+ *
+ * SYMPTOM: "When playing guitar fast, it shows PERFECT every time and
  *          matches to wrong subdivisions"
- * 
+ *
  * ROOT CAUSE ANALYSIS:
- * 
+ *
  * 1. MULTIPLE DETECTIONS (No Debouncing):
  *    - User plays one note → guitar string vibrates continuously
  *    - Audio signal crosses threshold repeatedly (not just once)
  *    - Every vibration = new detection timestamp
  *    - Result: One note registers as 5-10 separate "notes"
  *    - Fix: Add 100ms cooldown between detections
- * 
+ *
  * 2. WRONG SUBDIVISION MATCHING:
  *    - With multiple false detections happening rapidly
  *    - Each one searches ALL beats (past, present, future)
  *    - At least one false detection lands close to ANY subdivision
  *    - Result: Always finds a "PERFECT" match somewhere
  *    - Fix: Only search current and previous beat (limited window)
- * 
+ *
  * 3. INCOMPLETE CLICK SOUND:
  *    - Phase was resetting on every audio callback
  *    - Click only played for ~5-10ms instead of 30ms
  *    - Result: Weak, incomplete metronome sound
  *    - Fix: Maintain phase across callbacks using static variable
- * 
- * KEY INSIGHT: 
+ *
+ * KEY INSIGHT:
  * The bugs worked together - multiple detections + unlimited search window
  * guaranteed finding a "perfect" match even when playing was off-time.
- * 
- * SOLUTION: 
- * Debounce input (one detection per note) + limit search window 
+ *
+ * SOLUTION:
+ * Debounce input (one detection per note) + limit search window
  * (only nearby subdivisions) = accurate timing feedback
  * ============================================================================
  */
-*/
+
 /*
  * ============================================================================
  * ADVANCED GUITAR PRACTICE METRONOME WITH REAL-TIME TIMING ANALYSIS
@@ -78,7 +78,7 @@ computer science and music.
  * - Digital signal processing for click sound generation
  * - Audio threshold detection for instrument input
  *
- * 
+ *
  * DATE: November 2025
  * TECHNOLOGIES: C++17, RtAudio, Multi-threading, DSP
  * ============================================================================
@@ -108,7 +108,7 @@ computer science and music.
  * - Digital signal processing for click sound generation
  * - Audio threshold detection for instrument input with debouncing
  *
- 
+
  * ============================================================================
  */
 
