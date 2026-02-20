@@ -2,6 +2,7 @@
 
 
 ▶ **Demo Video:** [YouTube](https://www.youtube.com/watch?v=KWwBHGTHi14)  
+▶ **my new updaded Demo Video with new updated features:** [YouTube](https://www.youtube.com/watch?v=z1CMtNufOQc)  
 
 🔗 **LinkedIn:** [lionakis-lefteris](https://www.linkedin.com/in/lionakis-lefteris-698453346/)
 
