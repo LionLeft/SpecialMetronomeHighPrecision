@@ -1,0 +1,43 @@
+/*This C++ program calculates the number of samples per beat (SamplesPerBeat), an essential parameter in real-time audio and metronome applications. 
+By taking user input for the sampling rate (in Hz) and tempo (in beats per minute), 
+it determines how many audio samples correspond to one musical beat using the formula (SamplingRate × 60) / Tempo. 
+This calculation allows precise synchronization between digital audio signals and musical tempo, 
+forming a fundamental part of tempo-based sound generation systems.Its my first step of my progress.*/
+
+#include <iostream>
+
+// This program calculates the necessary "Samples Per Beat" 
+// based on user input for Sampling Rate and Tempo.
+// This value (SamplesPerBeat) is critical for Real-Time audio generation.
+int main()
+{
+	// Variables to hold user input
+	int sampling = 0;
+	float SamplesPerBeat = 0;
+	int tempo = 0;
+	
+	std::cout << "--- Metronome Core Logic Setup ---\n\n";
+
+	// 1. Get Sampling Rate (e.g., 44100 or 48000 Hz)
+	std::cout << "Please give the sampling (Hz): ";
+	std::cin >> sampling;
+	std::cout << "The sampling is: " << sampling;
+
+	// 2. Get Tempo (Beats Per Minute)
+	std::cout << std::endl << "Please give the tempo (BPM): ";	
+	std::cin >> tempo;
+	std::cout << "The tempo is: " << tempo;
+
+	// Core Calculation:
+	// SamplesPerBeat = (Samples / Second) * (60 Seconds / Minute) / (Beats / Minute)
+	// Use floating-point for audio timing precision
+	// Integer division would cause timing drift
+	SamplesPerBeat = (sampling * 60.0f) / tempo;
+	
+	// Display the result
+	std::cout << std::endl << "----------------------------------";
+	std::cout << std::endl << "The calculated SamplesPerBeat are: " << SamplesPerBeat;
+	std::cout << std::endl << "----------------------------------\n";
+	
+	return 0;
+}

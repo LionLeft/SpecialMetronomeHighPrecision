@@ -1,0 +1,570 @@
+/*
+ * ============================================================================
+ * REAL-TIME GUITAR PRACTICE METRONOME WITH LATENCY CALIBRATION
+ * ============================================================================
+ * 
+ * A multi-threaded audio application that provides millisecond-accurate
+ * timing feedback for guitar practice through real-time note detection
+ * and dual-layer latency compensation.
+ *
+ * Key Features:
+ * - Sample-accurate onset detection (sub-millisecond precision)
+ * - Automatic system latency calibration
+ * - Lock-free audio callback architecture
+ * - Hybrid sleep+spin timing for <0.5ms jitter
+ *
+ * Technologies: C++17, RtAudio, Multi-threading, Real-time DSP
+ * ============================================================================
+ */
+
+#include <iostream>
+#include <thread>
+#include <chrono>
+#include <atomic>
+#include <limits>
+#include <iomanip>
+#include <cmath>
+#include <exception>
+#include <vector>
+#include <mutex>
+
+#define _USE_MATH_DEFINES
+#include <math.h>
+
+#include "RtAudio.h"
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
+// ============================================================================
+// GLOBAL STATE
+// ============================================================================
+// Thread-safe communication between audio callbacks and main loop
+std::atomic<bool> stopFlag(false);
+std::atomic<double> lastPluckTime(-1.0);
+std::atomic<bool> shouldPlayClick(false);
+std::atomic<bool> accentClick(false);
+
+// Tick history for drift-free matching
+std::vector<double> tickTimes;
+std::mutex tickMutex;
+
+// Calibration state
+std::atomic<double> audioLatencyMs(0.0);
+std::atomic<bool> calibrationMode(false);
+std::vector<double> calibrationMeasurements;
+std::mutex calibrationMutex;
+
+// ============================================================================
+// AUDIO OUTPUT CALLBACK - Click Generation
+// ============================================================================
+int outputCallback(
+    void* outputBuffer,
+    void* inputBuffer,
+    unsigned int nBufferFrames,
+    double streamTime,
+    RtAudioStreamStatus status,
+    void* userData
+) {
+    float* out = static_cast<float*>(outputBuffer);
+
+    // Maintain state across callback invocations for complete 30ms click
+    static bool isPlaying = false;
+    static float clickPhase = 0.0f;
+    static float clickFrequency = 800.0f;
+
+    const float sampleRate = 44100.0f;
+    const float duration = 0.03f;
+
+    // Check for new click trigger
+    if (shouldPlayClick.load()) {
+        bool accent = accentClick.load();
+        clickFrequency = accent ? 1200.0f : 800.0f;
+        clickPhase = 0.0f;
+        isPlaying = true;
+        shouldPlayClick = false;
+    }
+
+    // Generate sine wave with exponential decay envelope
+    for (unsigned int i = 0; i < nBufferFrames; i++) {
+        if (isPlaying) {
+            float t = clickPhase / sampleRate;
+            if (t < duration) {
+                float envelope = std::exp(-t * 30.0f);
+                out[i] = std::sin(2.0f * M_PI * clickFrequency * t) * envelope * 0.5f;
+                clickPhase += 1.0f;
+            } else {
+                out[i] = 0.0f;
+                isPlaying = false;
+            }
+        } else {
+            out[i] = 0.0f;
+        }
+    }
+
+    return 0;
+}
+
+// ============================================================================
+// AUDIO INPUT CALLBACK - Note Detection with Buffer Compensation
+// ============================================================================
+int audioCallback(
+    void* outputBuffer,
+    void* inputBuffer,
+    unsigned int nBufferFrames,
+    double streamTime,
+    RtAudioStreamStatus status,
+    void* userData
+) {
+    if (!inputBuffer) return 0;
+
+    auto* startTimePtr = static_cast<double*>(userData);
+    float* in = static_cast<float*>(inputBuffer);
+    static float prev = 0.0f;
+    static double lastDetectionTime = -1.0;
+    
+    const float threshold = 0.25f;
+    const double debounceTime = 0.10;  // 100ms prevents multi-fire from single note
+
+    for (unsigned int i = 0; i < nBufferFrames; i++) {
+        float sample = in[i];
+
+        // Rising edge detection
+        if (std::fabs(sample) > threshold && std::fabs(prev) <= threshold) {
+            
+            double now = std::chrono::duration<double>(
+                std::chrono::steady_clock::now().time_since_epoch()
+            ).count();
+
+            // CRITICAL: Sample-accurate timestamping
+            // Compensates for buffer-induced latency by calculating exact
+            // sample position. Without this, all detections appear 0-5.8ms late.
+            // Formula: true_time = detection_time - (remaining_samples / sample_rate)
+            double noteTime = now - (double)(nBufferFrames - i) / 44100.0;
+
+            // Debouncing
+            if (lastDetectionTime < 0 || (noteTime - lastDetectionTime) >= debounceTime) {
+                lastPluckTime = noteTime;
+                lastDetectionTime = noteTime;
+            }
+        }
+        prev = sample;
+    }
+
+    return 0;
+}
+
+// ============================================================================
+// FUNCTION DECLARATIONS
+// ============================================================================
+void WaitForEnter();
+void AudioListener(double startTime);
+void AudioOutput();
+void playClickSound(bool accent = false);
+double RunCalibration();
+
+// ============================================================================
+// CALIBRATION - Measures System Latency
+// ============================================================================
+// Plays 10 clicks and measures round-trip time to determine constant
+// audio system delay (driver + hardware + OS scheduling).
+// Returns average latency in milliseconds.
+double RunCalibration() {
+    std::cout << "\n========================================\n";
+    std::cout << "AUDIO LATENCY CALIBRATION\n";
+    std::cout << "========================================\n\n";
+    std::cout << "This will measure the delay between click output\n";
+    std::cout << "and microphone detection.\n\n";
+    std::cout << "Please ensure:\n";
+    std::cout << "  1. Speakers/headphones are ON\n";
+    std::cout << "  2. Microphone is UNMUTED\n";
+    std::cout << "  3. Volume is moderate\n\n";
+    std::cout << "Press ENTER when ready...";
+    std::cin.get();
+
+    calibrationMode = true;
+    calibrationMeasurements.clear();
+
+    const int numCalibrationClicks = 10;
+    const double clickInterval = 1.0;
+
+    std::cout << "\nCalibrating... Please wait quietly.\n";
+    std::cout << "Playing " << numCalibrationClicks << " clicks...\n\n";
+
+    for (int i = 0; i < numCalibrationClicks; i++) {
+        auto clickTime = std::chrono::steady_clock::now();
+        double clickTimestamp = std::chrono::duration<double>(
+            clickTime.time_since_epoch()
+        ).count();
+
+        playClickSound(false);
+        std::cout << "Click " << (i + 1) << "... ";
+
+        // Wait for detection with timeout
+        double detectionTimeout = 0.5;
+        auto timeoutEnd = std::chrono::steady_clock::now() +
+                         std::chrono::duration<double>(detectionTimeout);
+
+        double detected = -1.0;
+        while (std::chrono::steady_clock::now() < timeoutEnd) {
+            detected = lastPluckTime.exchange(-1.0);
+            if (detected > 0.0) break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+
+        if (detected > 0.0) {
+            double latency = (detected - clickTimestamp) * 1000.0;
+            
+            // Sanity check: 1-500ms range
+            if (latency > 1.0 && latency < 500.0) {
+                std::lock_guard<std::mutex> lock(calibrationMutex);
+                calibrationMeasurements.push_back(latency);
+                std::cout << "Detected! (" << std::fixed << std::setprecision(1)
+                         << latency << " ms)\n";
+            } else {
+                std::cout << "Invalid measurement (ignored)\n";
+            }
+        } else {
+            std::cout << "Not detected (timeout)\n";
+        }
+
+        if (i < numCalibrationClicks - 1) {
+            std::this_thread::sleep_for(
+                std::chrono::duration<double>(clickInterval)
+            );
+        }
+    }
+
+    calibrationMode = false;
+
+    // Calculate average latency (require at least 3 successful measurements)
+    double avgLatency = 0.0;
+    {
+        std::lock_guard<std::mutex> lock(calibrationMutex);
+        if (calibrationMeasurements.size() >= 3) {
+            double sum = 0.0;
+            for (double m : calibrationMeasurements) {
+                sum += m;
+            }
+            avgLatency = sum / calibrationMeasurements.size();
+
+            std::cout << "\n========================================\n";
+            std::cout << "CALIBRATION RESULTS\n";
+            std::cout << "========================================\n";
+            std::cout << "Successful measurements: " << calibrationMeasurements.size()
+                     << "/" << numCalibrationClicks << "\n";
+            std::cout << "Average audio latency: " << std::fixed << std::setprecision(1)
+                     << avgLatency << " ms\n";
+            std::cout << "========================================\n\n";
+        } else {
+            std::cout << "\n*** WARNING: Calibration failed! ***\n";
+            std::cout << "Only " << calibrationMeasurements.size()
+                     << " successful measurements.\n";
+            std::cout << "Proceeding without latency compensation.\n\n";
+            avgLatency = 0.0;
+        }
+    }
+
+    return avgLatency;
+}
+
+// ============================================================================
+// MAIN PROGRAM
+// ============================================================================
+int main() {
+    // Display available audio APIs
+    std::vector<RtAudio::Api> apis;
+    RtAudio::getCompiledApi(apis);
+
+    std::cout << "=== RtAudio Diagnostic ===\n";
+    std::cout << "Compiled APIs (" << apis.size() << "):\n";
+    for (auto api : apis) {
+        std::cout << "  - " << RtAudio::getApiName(api) << std::endl;
+    }
+    std::cout << "========================\n\n";
+
+    // Start audio threads before calibration
+    auto start = std::chrono::steady_clock::now();
+    std::thread audioThread(AudioListener,
+        std::chrono::duration<double>(start.time_since_epoch()).count()
+    );
+    std::thread outputThread(AudioOutput);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+    // Run calibration
+    double measuredLatency = RunCalibration();
+    audioLatencyMs = measuredLatency;
+
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
+    // Get user input
+    int bpm;
+    std::cout << "Please enter the BPM: ";
+    if (!(std::cin >> bpm) || bpm <= 0) {
+        stopFlag = true;
+        audioThread.join();
+        outputThread.join();
+        return 1;
+    }
+
+    int subdivisionChoice;
+    std::cout << "Choose subdivision:\n";
+    std::cout << "1 = Quarter notes (default)\n";
+    std::cout << "2 = Half notes\n";
+    std::cout << "3 = Triplets\n";
+    std::cout << "4 = Eighth notes\n";
+    std::cin >> subdivisionChoice;
+
+    // Calculate timing
+    double beatSec = 60.0 / bpm;
+    int notesPerBeat = 1;
+    std::string subdivisionName = "Quarter notes";
+
+    if (subdivisionChoice == 2) {
+        notesPerBeat = 1;
+        subdivisionName = "Half notes";
+        beatSec = beatSec * 2;
+    }
+    else if (subdivisionChoice == 3) {
+        notesPerBeat = 3;
+        subdivisionName = "Triplets";
+    }
+    else if (subdivisionChoice == 4) {
+        notesPerBeat = 2;
+        subdivisionName = "Eighth notes";
+    }
+
+    double subTickSec = beatSec / notesPerBeat;
+
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
+    std::thread inputThread(WaitForEnter);
+
+#ifdef _WIN32
+    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
+#endif
+
+    start = std::chrono::steady_clock::now();
+
+    // Metronome main loop
+    int tickCount = 0;
+    std::cout << "\nStarting Metronome at " << bpm << " BPM (" << subdivisionName << ")\n";
+    std::cout << "Subdivision interval: " << std::fixed << std::setprecision(2)
+              << subTickSec * 1000 << " ms\n";
+    std::cout << "Audio latency compensation: " << std::fixed << std::setprecision(1)
+              << audioLatencyMs.load() << " ms\n";
+    std::cout << "Press ENTER to stop\n";
+    std::cout << "--------------------------------------------------------\n";
+
+    while (!stopFlag) {
+        tickCount++;
+
+        int mainBeat = (tickCount - 1) / notesPerBeat + 1;
+        int subDiv = (tickCount - 1) % notesPerBeat + 1;
+
+        // Hybrid sleep + spin for <0.5ms jitter
+        auto expectedTime = start + std::chrono::duration<double>(tickCount * subTickSec);
+        auto now = std::chrono::steady_clock::now();
+        auto timeToWait = expectedTime - now;
+
+        while (timeToWait.count() > 0.002) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            timeToWait = expectedTime - std::chrono::steady_clock::now();
+        }
+
+        while (std::chrono::steady_clock::now() < expectedTime) {
+            std::this_thread::yield();
+        }
+
+        auto actualTime = std::chrono::steady_clock::now();
+        std::chrono::duration<double> actualElapsed = actualTime - start;
+        std::chrono::duration<double> jitter = actualTime - expectedTime;
+
+        // Store tick timestamp
+        double tickTime = std::chrono::duration<double>(
+            actualTime.time_since_epoch()
+        ).count();
+
+        {
+            std::lock_guard<std::mutex> lock(tickMutex);
+            tickTimes.push_back(tickTime);
+            if (tickTimes.size() > 100)
+                tickTimes.erase(tickTimes.begin());
+        }
+
+        // Visual feedback
+        if (subDiv == 1) {
+            std::cout << "\n=== BEAT " << mainBeat << " ===";
+            playClickSound(true);
+        } else {
+            std::cout << "  Sub " << subDiv << " (Beat " << mainBeat << ")";
+            playClickSound(false);
+        }
+
+        std::cout << " | Time: " << std::fixed << std::setprecision(3)
+                  << actualElapsed.count() << "s"
+                  << " | Jitter: " << std::fixed << std::setprecision(2)
+                  << jitter.count() * 1000 << " ms";
+
+        // Timing analysis with dual-layer compensation
+        double pluck = lastPluckTime.exchange(-1.0);
+        if (pluck > 0.0 && !calibrationMode.load()) {
+            double minDiff = 1e9;
+            double bestError = 0.0;
+
+            // Find closest tick
+            {
+                std::lock_guard<std::mutex> lock(tickMutex);
+                for (double t : tickTimes) {
+                    double diff = pluck - t;
+                    if (std::fabs(diff) < std::fabs(minDiff)) {
+                        minDiff = diff;
+                        bestError = diff;
+                    }
+                }
+            }
+
+            // Apply calibrated latency compensation
+            double errorMs = bestError * 1000.0;
+            double compensatedErrorMs = errorMs - audioLatencyMs.load();
+
+            // Display feedback
+            if (std::fabs(compensatedErrorMs) < 30)
+                std::cout << " | *** PERFECT! ***";
+            else if (compensatedErrorMs > 0)
+                std::cout << " | LATE by " << std::fixed << std::setprecision(1)
+                         << compensatedErrorMs << " ms";
+            else
+                std::cout << " | EARLY by " << std::fixed << std::setprecision(1)
+                         << -compensatedErrorMs << " ms";
+        }
+
+        std::cout << std::endl;
+    }
+
+    // Cleanup
+    auto end = std::chrono::steady_clock::now();
+    std::chrono::duration<double> timeElapsed = end - start;
+
+    std::cout << "\n--------------------------------------------------------\n";
+    std::cout << "Elapsed time: " << std::fixed << std::setprecision(2)
+              << timeElapsed.count() << " sec\n";
+    std::cout << "Total ticks: " << tickCount << "\n";
+    std::cout << "Program Finished\n";
+
+    inputThread.join();
+    stopFlag = true;
+    audioThread.join();
+    outputThread.join();
+
+    return 0;
+}
+
+// ============================================================================
+// SUPPORTING FUNCTIONS
+// ============================================================================
+
+void WaitForEnter() {
+    std::cin.get();
+    stopFlag = true;
+}
+
+void AudioListener(double startTime) {
+    RtAudio adc;
+
+    if (adc.getDeviceCount() < 1) {
+        std::cerr << "No audio devices found!\n";
+        stopFlag = true;
+        return;
+    }
+
+    RtAudio::StreamParameters params;
+    params.deviceId = adc.getDefaultInputDevice();
+    params.nChannels = 1;
+    params.firstChannel = 0;
+
+    unsigned int sampleRate = 44100;
+    unsigned int bufferFrames = 256;
+
+    try {
+        adc.openStream(
+            nullptr,
+            &params,
+            RTAUDIO_FLOAT32,
+            sampleRate,
+            &bufferFrames,
+            &audioCallback,
+            &startTime
+        );
+        adc.startStream();
+    }
+    catch (const std::exception &e) {
+        std::cerr << "RtAudio exception: " << e.what() << "\n";
+        stopFlag = true;
+        return;
+    }
+    catch (...) {
+        std::cerr << "Unknown RtAudio error!\n";
+        stopFlag = true;
+        return;
+    }
+
+    while (!stopFlag) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
+    adc.stopStream();
+    adc.closeStream();
+}
+
+void playClickSound(bool accent) {
+    accentClick = accent;
+    shouldPlayClick = true;
+}
+
+void AudioOutput() {
+    RtAudio dac;
+
+    if (dac.getDeviceCount() < 1) {
+        std::cerr << "No audio output devices found!\n";
+        return;
+    }
+
+    RtAudio::StreamParameters params;
+    params.deviceId = dac.getDefaultOutputDevice();
+    params.nChannels = 1;
+    params.firstChannel = 0;
+
+    unsigned int sampleRate = 44100;
+    unsigned int bufferFrames = 512;
+
+    try {
+        dac.openStream(
+            &params,
+            nullptr,
+            RTAUDIO_FLOAT32,
+            sampleRate,
+            &bufferFrames,
+            &outputCallback,
+            nullptr
+        );
+        dac.startStream();
+    }
+    catch (const std::exception &e) {
+        std::cerr << "RtAudio output exception: " << e.what() << "\n";
+        return;
+    }
+    catch (...) {
+        std::cerr << "Unknown RtAudio output error!\n";
+        return;
+    }
+
+    while (!stopFlag) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
+    dac.stopStream();
+    dac.closeStream();
+}

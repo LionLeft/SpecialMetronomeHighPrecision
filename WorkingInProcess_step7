@@ -1,0 +1,7 @@
+My investigation into the system's timing inconsistencies followed a logical, experimental path. Initially, the program had major issues with the time signature feedback; "perfect," "late," and "early" labels
+were appearing randomly. I hypothesized that the single audio callback was the bottleneck, so I refactored the system into a dual callback architecture. 
+However, this change caused the feedback to disappear entirely. To isolate the problem, 
+I developed separate experimental programs for calibration and onset detection, but even when the detection worked, the timing inconsistency remained.
+The root cause was finally identified not as a threading or callback issue, but as buffer-induced detection latency. Because audio input is processed in fixed-size buffers (approximately 5.8 ms), 
+note onsets are only detected once the entire buffer is filled—even if the physical string pluck occurs at the very beginning of that window. This created a systematic timing offset.
+To solve this, I implemented a sample-level compensation that looks inside the buffer to find the exact index of the onset, allowing the program to calculate the true timing of the note relative to the metronome.
