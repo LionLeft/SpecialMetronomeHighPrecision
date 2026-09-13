@@ -4,10 +4,12 @@
 ▶ **Demo Video:** [YouTube](https://www.youtube.com/watch?v=KWwBHGTHi14)  
 ▶ **my new updaded Demo Video with new updated features:** [YouTube](https://www.youtube.com/watch?v=z1CMtNufOQc)  
 
+▶ I transferred my metronome project to JUCE. You can see it here: https://youtu.be/kkrD9IrvnX8
+
+
 🔗 **LinkedIn:** [lionakis-lefteris](https://www.linkedin.com/in/lionakis-lefteris-698453346/)
 
 💻 **GitHub:** [LionLeft](https://github.com/LionLeft)
-I transferred my metronome project to JUCE. You can see it here: https://youtu.be/kkrD9IrvnX8
 
 I’m a 43-year-old Computer Science student at the Hellenic Open University and also a guitar student — I’ve been taking guitar lessons for seven years and continue to do so.
 
