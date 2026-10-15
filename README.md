@@ -5,7 +5,7 @@
 ▶ **my new updated Demo Video with new updated features:** [YouTube](https://www.youtube.com/watch?v=z1CMtNufOQc)  
 
 ▶ I transferred my metronome project to JUCE. You can see it here: https://youtu.be/kkrD9IrvnX8
-
+Project Update: Porting my Real-Time Guitar Metronome to JUCE : I added calibration for click and guitar pluck latency : https://youtu.be/ZUY9W1q2-qs 
 
 🔗 **LinkedIn:** [lionakis-lefteris](https://www.linkedin.com/in/lionakis-lefteris-698453346/)
 
